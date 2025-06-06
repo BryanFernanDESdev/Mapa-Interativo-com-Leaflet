@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
   <meta charset="UTF-8" />
-  <title>Mapa Fullscreen com Leaflet</title>
+  <title>Mapa Interativo Fullscreen com Leaflet</title>
 
   <!-- CSS Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
@@ -13,33 +13,31 @@
       margin: 0;
       padding: 0;
     }
-
     #map {
       height: 100%;
       width: 100%;
     }
-
-    /* Container dos botões sobre o mapa */
     #controls {
       position: absolute;
       top: 10px;
       left: 10px;
-      z-index: 1000; /* para ficar acima do mapa */
+      z-index: 1000;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
     }
-
     button {
       padding: 8px 16px;
-      background: #1976d2;
-      color: white;
+      background-color: #1976d2;
+      color: #fff;
       border: none;
       border-radius: 4px;
       cursor: pointer;
       font-size: 14px;
-      margin-right: 8px;
-      margin-bottom: 5px;
+      transition: background-color 0.3s ease;
     }
     button:hover {
-      background: #1565c0;
+      background-color: #1565c0;
     }
   </style>
 </head>
@@ -48,6 +46,7 @@
     <button id="centralizar">Centralizar em Blumenau</button>
     <button id="minhaLocalizacao">Mostrar minha localização</button>
   </div>
+
   <div id="map"></div>
 
   <!-- JS Leaflet -->
@@ -55,71 +54,67 @@
 
   <script>
     const centroBlumenau = [-26.9181, -49.0661];
-
-    const dados = [
-      {"nome":"Vila Germânica","categoria":"Turismo","latitude":-26.915682,"longitude":-49.071533},
-      {"nome":"Museu da Cerveja","categoria":"Museus","latitude":-26.922246,"longitude":-49.066144},
-      {"nome":"Parque Ramiro Ruediger","categoria":"Parques","latitude":-26.917789,"longitude":-49.070393},
-      {"nome":"Catedral São Paulo Apóstolo","categoria":"Igrejas","latitude":-26.922872,"longitude":-49.065857},
-      {"nome":"Museu da Família Colonial","categoria":"Museus","latitude":-26.919829,"longitude":-49.063916},
-      {"nome":"Praça Hercílio Luz","categoria":"Praças","latitude":-26.922059,"longitude":-49.065338},
-      {"nome":"Teatro Carlos Gomes","categoria":"Turismo","latitude":-26.920370,"longitude":-49.063940},
-      {"nome":"Parque Spitzkopf","categoria":"Parques","latitude":-26.841000,"longitude":-49.089000},
-      {"nome":"Igreja Matriz Itoupava Seca","categoria":"Igrejas","latitude":-26.900800,"longitude":-49.071200},
-      {"nome":"Praça Victor Konder","categoria":"Praças","latitude":-26.920800,"longitude":-49.067500},
-      {"nome":"Museu Hering","categoria":"Museus","latitude":-26.917000,"longitude":-49.070000},
-      {"nome":"Parque São Francisco de Assis","categoria":"Parques","latitude":-26.917600,"longitude":-49.062800}
-    ];
-
     const map = L.map('map').setView(centroBlumenau, 13);
 
+    // Camada base OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
     }).addTo(map);
 
-    document.getElementById('centralizar').onclick = () => {
+    // Centralizar no botão
+    document.getElementById('centralizar').addEventListener('click', () => {
       map.setView(centroBlumenau, 13);
-    };
+    });
 
-    document.getElementById('minhaLocalizacao').onclick = () => {
+    // Mostrar localização do usuário
+    document.getElementById('minhaLocalizacao').addEventListener('click', () => {
       if (!navigator.geolocation) {
-        alert('Geolocalização não é suportada pelo seu navegador.');
+        alert('Geolocalização não suportada pelo seu navegador.');
         return;
       }
-
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-
-          L.marker([lat, lon])
+        position => {
+          const { latitude, longitude } = position.coords;
+          L.marker([latitude, longitude])
             .addTo(map)
             .bindPopup('Você está aqui!')
             .openPopup();
-
-          map.setView([lat, lon], 15);
+          map.setView([latitude, longitude], 15);
         },
-        (err) => {
-          alert('Não foi possível obter sua localização: ' + err.message);
+        error => {
+          alert('Não foi possível obter sua localização: ' + error.message);
         }
       );
-    };
-
-    const categorias = {};
-
-    dados.forEach(item => {
-      if (!categorias[item.categoria]) {
-        categorias[item.categoria] = L.layerGroup();
-      }
-      const marker = L.marker([item.latitude, item.longitude])
-        .bindPopup(`<b>${item.nome}</b><br><i>${item.categoria}</i>`);
-      categorias[item.categoria].addLayer(marker);
     });
 
-    Object.values(categorias).forEach(layer => layer.addTo(map));
+    // Buscar dados do arquivo dados.json
+    fetch('dados.json')
+      .then(response => {
+        if (!response.ok) throw new Error('Erro ao carregar dados.json');
+        return response.json();
+      })
+      .then(dados => {
+        const categorias = {};
 
-    L.control.layers(null, categorias, {collapsed: false}).addTo(map);
+        dados.forEach(item => {
+          if (!categorias[item.categoria]) {
+            categorias[item.categoria] = L.layerGroup();
+          }
+          const marker = L.marker([item.latitude, item.longitude])
+            .bindPopup(`<b>${item.nome}</b><br><i>${item.categoria}</i>`);
+          categorias[item.categoria].addLayer(marker);
+        });
+
+        // Adiciona todas as camadas ao mapa inicialmente
+        Object.values(categorias).forEach(layer => layer.addTo(map));
+
+        // Controle de camadas para filtrar por categoria
+        L.control.layers(null, categorias, { collapsed: false }).addTo(map);
+      })
+      .catch(error => {
+        alert('Erro ao carregar os dados do mapa: ' + error.message);
+        console.error(error);
+      });
   </script>
 </body>
 </html>
-<!-- Commit de teste para push -->
